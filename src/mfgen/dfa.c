@@ -5,15 +5,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void dfa_alphabet_init(struct dfa *dfa, struct array *tokens)
-{
-	dfa->alphabet_size = 1;
-	memset(dfa->alphabet, 0, sizeof dfa->alphabet);
+#include "array.h"
 
-	for (size_t i = 0; i < tokens->size; i++) {
+static int dfa_alphabet_init(struct dfa *dfa, struct token *tokens)
+{
+	size_t tokens_length;
+
+	dfa->alphabet_size = 1;
+	dfa->alphabet = calloc(256, sizeof *dfa->alphabet);
+	if (dfa->alphabet == NULL)
+		return 1;
+
+	tokens_length = array_length(tokens);
+	for (size_t i = 0; i < tokens_length; i++) {
 		struct token *curr_token;
 
-		curr_token = tokens->elems[i];
+		curr_token = &tokens[i];
 		for (size_t j = 0; curr_token->value[j] != '\0'; j++) {
 			uint8_t curr_chr;
 
@@ -22,12 +29,14 @@ static void dfa_alphabet_init(struct dfa *dfa, struct array *tokens)
 				dfa->alphabet[curr_chr] = dfa->alphabet_size++;
 		}
 	}
+
+	return 0;
 }
 
 
-static int dfa_trans_indices_init(struct dfa *dfa, struct array *tokens)
+static int dfa_trans_indices_init(struct dfa *dfa, struct token *tokens)
 {
-	size_t aux;
+	size_t aux, tokens_length;
 
 	aux = dfa->alphabet_size + 1;
 
@@ -47,11 +56,12 @@ static int dfa_trans_indices_init(struct dfa *dfa, struct array *tokens)
 			return 1;
 	}
 
-	for (size_t i = 0; i < tokens->size; i++) {
+	tokens_length = array_length(tokens);
+	for (size_t i = 0; i < tokens_length; i++) {
 		struct token *curr_token;
 		size_t prev_symbol;
 
-		curr_token = tokens->elems[i];
+		curr_token = &tokens[i];
 		prev_symbol = dfa->alphabet_size;
 		for (size_t j = 0; curr_token->value[j] != '\0'; j++) {
 			uint8_t curr_chr, curr_symbol;
@@ -67,7 +77,7 @@ static int dfa_trans_indices_init(struct dfa *dfa, struct array *tokens)
 	return 0;
 }
 
-int dfa_insert_token(struct dfa *dfa, struct token *token)
+static int dfa_insert_token(struct dfa *dfa, struct token *token)
 {
 	size_t state, prev_symbol;
 
@@ -76,27 +86,24 @@ int dfa_insert_token(struct dfa *dfa, struct token *token)
 	for (size_t i = 0; token->value[i] != '\0'; i++) {
 		uint8_t curr_chr, curr_trans;
 		size_t curr_symbol;
-		uint32_t **state_trans;
 
 		curr_chr = token->value[i];
 		curr_symbol = dfa->alphabet[curr_chr];
 		curr_trans = dfa->trans_indices[prev_symbol][curr_symbol];
 
-		state_trans = (uint32_t **) dfa->state_trans.elems;
-		if (state_trans[state][curr_trans] == 0) {
+		if (dfa->state_trans[state][curr_trans] == 0) {
 			uint32_t *new_state;
 
-			new_state = calloc(dfa->trans_indices_sizes[curr_symbol], sizeof *new_state);
-			if (new_state == NULL)
-				return 1;
-			array_push(&dfa->state_trans, new_state);
-			array_push(&dfa->state_trans_sizes, &dfa->trans_indices_sizes[curr_symbol]);
+			// error check
+			new_state = array_create(sizeof *new_state);
+			new_state = array_resize(new_state, dfa->trans_indices_sizes[curr_symbol]);
+			memset(new_state, 0, sizeof *new_state * array_length(new_state));
+			dfa->state_trans = array_push(dfa->state_trans, &new_state);
 
-			state_trans = (uint32_t **) dfa->state_trans.elems;
-			state_trans[state][curr_trans] = dfa->state_trans.size - 1;
+			dfa->state_trans[state][curr_trans] = array_length(dfa->state_trans) - 1;
 		}
 
-		state = state_trans[state][curr_trans];
+		state = dfa->state_trans[state][curr_trans];
 		prev_symbol = curr_symbol;
 	}
 	// set state as final
@@ -104,36 +111,40 @@ int dfa_insert_token(struct dfa *dfa, struct token *token)
 	return 0;
 }
 
-int dfa_init(struct dfa *dfa, struct array *tokens)
+int dfa_init(struct dfa *dfa, struct token *tokens)
 {
-	int ret;
 	uint32_t *error_state, *start_state;
+	size_t tokens_length;
+	int ret;
 
-	dfa_alphabet_init(dfa, tokens);
+	ret = dfa_alphabet_init(dfa, tokens);
+	if (ret != 0)
+		return 1;
+
 	ret = dfa_trans_indices_init(dfa, tokens);
 	if (ret != 0)
 		return 1;
 
+	dfa->state_trans = array_create(sizeof *dfa->state_trans);
 	dfa->start = 1;
-	array_init(&dfa->state_trans);
-	array_init(&dfa->state_trans_sizes);
 
-	error_state = calloc(dfa->trans_indices_sizes[0], sizeof *error_state);
-	if (error_state == NULL)
-		return 1;
-	array_push(&dfa->state_trans, error_state);
-	array_push(&dfa->state_trans_sizes, &dfa->trans_indices_sizes[0]);
+	// error check
+	error_state = array_create(sizeof *error_state);
+	error_state = array_resize(error_state, dfa->trans_indices_sizes[0]);
+	memset(error_state, 0, sizeof *error_state * array_length(error_state));
+	dfa->state_trans = array_push(dfa->state_trans, &error_state);
 
-	start_state = calloc(dfa->trans_indices_sizes[dfa->alphabet_size], sizeof *error_state);
-	if (start_state == NULL)
-		return 1;
-	array_push(&dfa->state_trans, start_state);
-	array_push(&dfa->state_trans_sizes, &dfa->trans_indices_sizes[dfa->alphabet_size]);
+	// error check
+	start_state = array_create(sizeof *start_state);
+	start_state = array_resize(start_state, dfa->trans_indices_sizes[dfa->alphabet_size]);
+	memset(start_state, 0, sizeof *start_state * array_length(start_state));
+	dfa->state_trans = array_push(dfa->state_trans, &start_state);
 
-	for (size_t i = 0; i < tokens->size; i++) {
+	tokens_length = array_length(tokens);
+	for (size_t i = 0; i < tokens_length; i++) {
 		struct token *curr_token;
 
-		curr_token = tokens->elems[i];
+		curr_token = &tokens[i];
 		ret = dfa_insert_token(dfa, curr_token);
 		if (ret != 0) // cleanup..
 			return 1;

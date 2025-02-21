@@ -3,16 +3,11 @@
 
 #include <stddef.h>
 
-struct array {
-	size_t size;
-	void **elems;
-	size_t _cap;
-};
-
-int array_init(struct array *arr);
-int array_destroy(struct array *arr);
-int array_resize(struct array *arr, size_t size);
-int array_push(struct array *arr, void *elem);
-void *array_pop(struct array *arr);
+void *array_create(size_t unit);
+void array_destroy(void *array);
+size_t array_length(void *array);
+void *array_resize(void *array, size_t length);
+void *array_push(void *array, void *elem);
+void *array_pop(void *array);
 
 #endif

@@ -1,85 +1,102 @@
 #include "array.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
-int array_init(struct array *arr)
+struct array_header {
+	size_t length;
+	size_t capacity;
+	size_t unit;
+};
+
+void *array_create(size_t unit)
 {
-	if (arr == NULL)
-		return 1;
+	struct array_header *header;
 
-	arr->size = 0;
-	arr->elems = NULL;
-	arr->_cap = 0;
-
-	return 0;
-}
-
-int array_destroy(struct array *arr)
-{
-	if (arr == NULL)
-		return 1;
-
-	free(arr->elems);
-
-	return 0;
-}
-
-int array_resize(struct array *arr, size_t size)
-{
-	if (arr == NULL)
-		return 1;
-
-	if (size > arr->_cap) {
-		size_t new_cap;
-		void **new_elems;
-
-		new_cap = 1;
-		// im not sure this isn't UB:
-		while ((new_cap <<= 1) < size && new_cap != 0)
-			;
-		if (new_cap == 0)
-			return 1;
-		new_elems = realloc(arr->elems, new_cap * sizeof *arr->elems);
-		if (new_elems == NULL)
-			return 1;
-
-		arr->_cap = new_cap;
-		arr->elems = new_elems;
-	}
-	arr->size = size;
-
-	return 0;
-}
-
-int array_push(struct array *arr, void *elem)
-{
-	if (arr == NULL)
-		return 1;
-
-	if (arr->size == arr->_cap) {
-		size_t new_cap;
-		void **new_elems;
-
-		new_cap = arr->_cap == 0 ? 1 : arr->_cap * 2;
-		if (new_cap < arr->_cap)
-			return 1;
-		new_elems = realloc(arr->elems, new_cap * sizeof *arr->elems);
-		if (new_elems == NULL)
-			return 1;
-
-		arr->_cap = new_cap;
-		arr->elems = new_elems;
-	}
-	arr->elems[arr->size++] = elem;
-
-	return 0;
-}
-
-void *array_pop(struct array *arr)
-{
-	if (arr == NULL || arr->size == 0)
+	header = malloc(sizeof *header);
+	if (header == NULL)
 		return NULL;
 
-	return arr->elems[--arr->size];
+	header->length = 0;
+	header->capacity = 0;
+	header->unit = unit;
+
+	return header + 1;
+}
+
+void array_destroy(void *array)
+{
+	struct array_header *header;
+
+	header = array - sizeof *header;
+	free(header);
+}
+
+size_t array_length(void *array)
+{
+	struct array_header *header;
+
+	header = array - sizeof *header;
+
+	return header->length;
+}
+
+void *array_resize(void *array, size_t length)
+{
+	struct array_header *header;
+
+	header = array - sizeof *header;
+	if (length > header->capacity) {
+		size_t new_size, new_capacity;
+
+		new_capacity = header->capacity == 0 ? 1 : header->capacity;
+		while (new_capacity < length) {
+			new_capacity *= 2;
+			if (new_capacity < header->capacity) {
+				new_capacity = SIZE_MAX;
+				break;
+			}
+		}
+
+		new_size = sizeof *header + new_capacity * header->unit;
+		if (new_size < sizeof *header + header->capacity * header->unit)
+			return NULL;
+		header = realloc(header, new_size);
+		if (header == NULL)
+			return NULL;
+
+		header->capacity = new_capacity;
+		array = header + 1;
+	}
+	header->length = length;
+
+	return array;
+}
+
+void *array_push(void *array, void *elem)
+{
+	struct array_header *header;
+
+	array = array_resize(array, array_length(array) + 1);
+	if (array == NULL)
+		return NULL;
+
+	header = array - sizeof *header;
+	memcpy(array + (header->length - 1) * header->unit, elem, header->unit);
+
+	return array;
+}
+
+void *array_pop(void *array)
+{
+	struct array_header *header;
+
+	header = array - sizeof *header;
+	if (header->length == 0)
+		return NULL;
+	header->length--;
+
+	return array + header->length * header->unit;
 }

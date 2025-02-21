@@ -4,22 +4,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "array.h"
 #include "token.h"
 
 struct dfa {
-	uint8_t alphabet[256];
+	uint8_t *alphabet;
 	uint8_t alphabet_size;
 
 	uint8_t **trans_indices;
 	uint8_t *trans_indices_sizes;
 
-	size_t start;
-	struct array state_trans;
-	struct array state_trans_sizes;
+	uint32_t **state_trans;
+	uint32_t start;
 };
 
-int dfa_init(struct dfa *dfa, struct array *tokens);
+int dfa_init(struct dfa *dfa, struct token *tokens);
 int dfa_destroy(struct dfa *dfa);
 
 #endif

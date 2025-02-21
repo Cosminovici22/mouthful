@@ -6,20 +6,20 @@
 #include "dfa.h"
 #include "token.h"
 
-int read_tokens(FILE *fin, struct array *tokens)
+int read_tokens(FILE *fin, struct token **tokens)
 {
 	while (!feof(fin)) {
-		struct token *token;
+		struct token token,*aux;
 		int ret;
 
-		token = malloc(sizeof *token);
-		if (token == NULL)
+		ret = fscanf(fin, " %9d : %ms ", &token.type, &token.value);
+		if (ret != 2) // might not work
 			return 1;
-		array_push(tokens, token);
 
-		ret = fscanf(fin, " %9u : %ms ", &token->type, &token->value);
-		if (ret != 2)
+		aux = array_push(*tokens, &token);
+		if (aux == NULL)
 			return 1;
+		*tokens = aux;
 	}
 
 	return 0;
@@ -37,10 +37,10 @@ int write_dfa(FILE *fout, struct dfa *dfa)
 		printf("\n");
 	}
 
-	for (int i = 0; i < dfa->state_trans.size; i++) {
+	for (int i = 0; i < array_length(dfa->state_trans); i++) {
 		printf("%d: ", i);
-		for (int j = 0; j < *(uint8_t *) dfa->state_trans_sizes.elems[i]; j++)
-			printf("%d ", ((uint32_t *) dfa->state_trans.elems[i])[j]);
+		for (int j = 0; j < array_length(dfa->state_trans[i]); j++)
+			printf("%d ", dfa->state_trans[i][j]);
 		printf("\n");
 	}
 
@@ -50,7 +50,7 @@ int write_dfa(FILE *fout, struct dfa *dfa)
 int main(int argc, char *argv[])
 {
 	FILE *fin, *fout;
-	struct array tokens;
+	struct token *tokens;
 	struct dfa dfa;
 	int ret;
 
@@ -62,17 +62,17 @@ int main(int argc, char *argv[])
 	// if (fout == NULL)
 	// 	return 1;
 
-	array_init(&tokens);
+	tokens = array_create(sizeof *tokens);
 
 	ret = read_tokens(fin, &tokens);
 	if (ret != 0)
 		return 1;
 
-	ret = dfa_init(&dfa, &tokens);
+	ret = dfa_init(&dfa, tokens);
 	if (ret != 0)
 		return 1;
 
-	array_destroy(&tokens); // each token and token->value must be freed
+	array_destroy(tokens); // each token->value must be freed
 
 	ret = write_dfa(fout, &dfa);
 	if (ret != 0)

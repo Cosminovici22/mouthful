@@ -2,7 +2,7 @@
 #define TOKEN_H
 
 struct token {
-	int type;
+	unsigned int type;
 	char *value;
 };
 

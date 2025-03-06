@@ -6,22 +6,57 @@
 #include <string.h>
 
 struct array_header {
+	size_t unit;
 	size_t length;
 	size_t capacity;
-	size_t unit;
 };
 
-void *array_create(size_t unit)
+static inline struct array_header *header_of(void *array)
+{
+	return array - sizeof(struct array_header);
+}
+
+static inline int add_wraps(size_t a, size_t b)
+{
+	return SIZE_MAX - b < a;
+}
+
+static inline int mul_wraps(size_t a, size_t b)
+{
+	return a * b / a != b;
+}
+
+static void *
+header_alloc(struct array_header *header, size_t unit, size_t capacity)
+{
+	size_t size;
+
+	if (mul_wraps(capacity, unit))
+		return NULL;
+	size = capacity * unit;
+
+	if (add_wraps(size, sizeof *header))
+		return NULL;
+	size += sizeof *header;
+
+	header = realloc(header, size);
+	if (header == NULL)
+		return NULL;
+	header->capacity = capacity;
+
+	return header;
+}
+
+void *array_create(size_t length, size_t unit)
 {
 	struct array_header *header;
 
-	header = malloc(sizeof *header);
+	header = header_alloc(NULL, unit, length);
 	if (header == NULL)
 		return NULL;
 
-	header->length = 0;
-	header->capacity = 0;
 	header->unit = unit;
+	header->length = length;
 
 	return header + 1;
 }
@@ -30,7 +65,7 @@ void array_destroy(void *array)
 {
 	struct array_header *header;
 
-	header = array - sizeof *header;
+	header = header_of(array);
 	free(header);
 }
 
@@ -38,7 +73,7 @@ size_t array_length(void *array)
 {
 	struct array_header *header;
 
-	header = array - sizeof *header;
+	header = header_of(array);
 
 	return header->length;
 }
@@ -47,27 +82,12 @@ void *array_resize(void *array, size_t length)
 {
 	struct array_header *header;
 
-	header = array - sizeof *header;
+	header = header_of(array);
 	if (length > header->capacity) {
-		size_t new_size, new_capacity;
-
-		new_capacity = header->capacity == 0 ? 1 : header->capacity;
-		while (new_capacity < length) {
-			new_capacity *= 2;
-			if (new_capacity < header->capacity) {
-				new_capacity = SIZE_MAX;
-				break;
-			}
-		}
-
-		new_size = sizeof *header + new_capacity * header->unit;
-		if (new_size < sizeof *header + header->capacity * header->unit)
-			return NULL;
-		header = realloc(header, new_size);
+		header = header_alloc(header, header->unit, length);
 		if (header == NULL)
 			return NULL;
 
-		header->capacity = new_capacity;
 		array = header + 1;
 	}
 	header->length = length;
@@ -79,12 +99,25 @@ void *array_push(void *array, void *elem)
 {
 	struct array_header *header;
 
-	array = array_resize(array, array_length(array) + 1);
-	if (array == NULL)
-		return NULL;
+	header = header_of(array);
+	if (header->length == header->capacity) {
+		size_t capacity;
 
-	header = array - sizeof *header;
-	memcpy(array + (header->length - 1) * header->unit, elem, header->unit);
+		if (header->capacity == 0)
+			capacity = 1;
+		else if (!mul_wraps(2, header->capacity))
+			capacity = 2 * header->capacity;
+		else
+			return NULL;
+
+		header = header_alloc(header, header->unit, capacity);
+		if (header == NULL)
+			return NULL;
+
+		array = header + 1;
+	}
+	memcpy(array + header->length * header->unit, elem, header->unit);
+	header->length++;
 
 	return array;
 }
@@ -93,7 +126,7 @@ void *array_pop(void *array)
 {
 	struct array_header *header;
 
-	header = array - sizeof *header;
+	header = header_of(array);
 	if (header->length == 0)
 		return NULL;
 	header->length--;

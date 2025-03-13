@@ -3,9 +3,9 @@
 #include <limits.h>
 #include <stdlib.h>
 
-byte_t *encoding_create(size_t length)
+unsigned char *encoding_create(size_t length)
 {
-	byte_t *header;
+	unsigned char *header;
 
 	if (length > UCHAR_MAX + 1)
 		return NULL;
@@ -17,17 +17,17 @@ byte_t *encoding_create(size_t length)
 	return header + 1;
 }
 
-void encoding_destroy(byte_t *encoding)
+void encoding_destroy(unsigned char *encoding)
 {
 	free(encoding - 1);
 }
 
-size_t encoding_size(byte_t *encoding)
+size_t encoding_size(unsigned char *encoding)
 {
 	return encoding[-1] + 1;
 }
 
-void encoding_add(byte_t *encoding, byte_t byte)
+void encoding_add(unsigned char *encoding, unsigned char byte)
 {
 	if (encoding[byte] != 0 || encoding[-1] == UCHAR_MAX)
 		return;

@@ -11,7 +11,7 @@ struct array_header {
 	size_t capacity;
 };
 
-static inline struct array_header *header_of(void *array)
+static inline struct array_header *header_of(const void *array)
 {
 	return array - sizeof(struct array_header);
 }
@@ -69,7 +69,7 @@ void array_destroy(void *array)
 	free(header);
 }
 
-size_t array_length(void *array)
+size_t array_length(const void *array)
 {
 	struct array_header *header;
 

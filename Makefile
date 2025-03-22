@@ -4,11 +4,9 @@ BUILD_DIR := build
 SRC_DIR := src
 TESTS_DIR := tests
 
-MFAPI_SRCS := mfapi.c
-MFGEN_SRCS := array.c encoding.c mfgen.c mflexer_gen.c
-MFTOK_SRCS := $(MFAPI_SRCS) mftok.c
+MFGEN_SRCS := array.c encoding.c mfgen.c
+MFTOK_SRCS := mftok.c
 
-MFAPI_OBJS := $(patsubst %.c, $(BUILD_DIR)/%.o, $(MFAPI_SRCS))
 MFGEN_OBJS := $(patsubst %.c, $(BUILD_DIR)/%.o, $(MFGEN_SRCS))
 MFTOK_OBJS := $(patsubst %.c, $(BUILD_DIR)/%.o, $(MFTOK_SRCS))
 
@@ -16,7 +14,7 @@ MFTOK_OBJS := $(patsubst %.c, $(BUILD_DIR)/%.o, $(MFTOK_SRCS))
 
 all: mftok mfgen
 
-mfapi: $(MFAPI_OBJS)
+mfapi: $(MFTOK_OBJS)
 
 mfgen: $(MFGEN_OBJS)
 	$(CC) $(CFLAGS) -o $(BUILD_DIR)/$@ $^

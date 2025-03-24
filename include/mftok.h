@@ -21,7 +21,7 @@ int mflexer_init(struct mflexer *lexer, FILE *file);
 /*
  * Free any resources held by the given lexer
  *
- * @param lexer: pointer to a `struct mflexer` initialized with `mflexer_init`
+ * @param lexer: pointer to a `struct mflexer` initialized with `mflexer_init()`
  */
 void mflexer_destroy(struct mflexer *lexer);
 
@@ -31,7 +31,7 @@ void mflexer_destroy(struct mflexer *lexer);
  * token is encountered, the file position indicator is not advanced. Function
  * is not responsible for reporting EOF, however I/O errors are reported.
  *
- * @param lexer: pointer to a `struct mflexer` initialized with `mflexer_init`
+ * @param lexer: pointer to a `struct mflexer` initialized with `mflexer_init()`
  * @param file: pointer to the stream to be tokenized
  *
  * @return the type of the identified token, `MFSTATUS_INVALID` in case of an
@@ -45,7 +45,7 @@ int mflexer_tokenize_stream(const struct mflexer *lexer, FILE *file);
  * identified token. If an invalid token is encountered, the offset is not
  * advanced. Function is not responsible for reporting the end of the string.
  *
- * @param lexer: pointer to a `struct mflexer` initialized with `mflexer_init`
+ * @param lexer: pointer to a `struct mflexer` initialized with `mflexer_init()`
  * @param string: string to be tokenized, ending with `\0`
  * @param offset: position relative to the beginning of `string`
  *

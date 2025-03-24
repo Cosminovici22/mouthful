@@ -209,28 +209,28 @@ mflexer_trans_init(struct mflexer *lexer, const struct token *tokens)
 	 */
 	ret = mflexer_create_state(lexer, encoding_size(lexer->alphabet));
 	if (ret != MFSTATUS_SUCCESS)
-		goto err_lexer_trans_alloc;
+		goto err_create_state;
 
 	ret = mflexer_create_state(lexer
 		, encoding_size(lexer->trans_indices[lexer->alphabet[0]]));
 	if (ret != MFSTATUS_SUCCESS)
-		goto err_lexer_trans_alloc;
+		goto err_create_state;
 
 	tokens_length = array_length(tokens);
 	for (size_t i = 0; i < tokens_length; i++) {
 		ret = mflexer_insert_token(lexer, &tokens[i]);
 		if (ret != MFSTATUS_SUCCESS)
-			goto err_lexer_trans_alloc;
+			goto err_create_state;
 	}
 
 	return MFSTATUS_SUCCESS;
 
-err_lexer_trans_alloc:
+err_create_state:
 	array_destroy(lexer->final);
-
-err_lexer_final_alloc:
 	while ((temp = array_pop(lexer->trans)) != NULL)
 		array_destroy(*temp);
+
+err_lexer_final_alloc:
 	array_destroy(lexer->trans);
 
 	return MFSTATUS_ERR_MEM;
@@ -239,6 +239,7 @@ err_lexer_final_alloc:
 static int mflexer_gen(struct mflexer *lexer, FILE *file)
 {
 	struct token *tokens, *token;
+	void **temp;
 	int ret;
 
 	tokens = array_create(0, sizeof *tokens);
@@ -247,19 +248,35 @@ static int mflexer_gen(struct mflexer *lexer, FILE *file)
 
 	ret = read_tokens(file, &tokens);
 	if (ret != MFSTATUS_SUCCESS)
-		goto out;
+		goto err_alphabet_init;
 
 	ret = mflexer_alphabet_init(lexer, tokens);
 	if (ret != MFSTATUS_SUCCESS)
-		goto out;
+		goto err_alphabet_init;
 
 	ret = mflexer_trans_indices_init(lexer, tokens);
 	if (ret != MFSTATUS_SUCCESS)
-		goto out;
+		goto err_trans_indices_init;
 
 	ret = mflexer_trans_init(lexer, tokens);
+	if (ret != MFSTATUS_SUCCESS)
+		goto err_trans_init;
 
-out:
+	while ((token = array_pop(tokens)) != NULL)
+		free(token->value);
+	array_destroy(tokens);
+
+	return ret;
+
+err_trans_init:
+	while ((temp = array_pop(lexer->trans_indices)) != NULL)
+		encoding_destroy(*temp);
+	array_destroy(lexer->trans_indices);
+
+err_trans_indices_init:
+	encoding_destroy(lexer->alphabet);
+
+err_alphabet_init:
 	while ((token = array_pop(tokens)) != NULL)
 		free(token->value);
 	array_destroy(tokens);
@@ -384,7 +401,7 @@ int main(int argc, char *argv[])
 	struct mflexer lexer;
 	int ret;
 
-	ASSERT(argc == 3, "Usage: mfgen <infile> <outfile>\n");
+	ASSERT(argc == 3, "Usage: mfgen <token_list> <lexer_dump>\n");
 
 	infile = fopen(argv[1], "rt");
 	ASSERT(infile != NULL, "%s: unable to open '%s' for reading\n"

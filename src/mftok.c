@@ -208,8 +208,8 @@ int main(int argc, char *argv[])
 
 	while (!feof(file)) {
 		ret = mflexer_tokenize_stream(&lexer, file);
-		if (ret == MFSTATUS_ERR_TOK)
-			break;
+		ASSERT(ret != MFSTATUS_ERR_TOK, "%s: unknown token encountered "
+			"in '%s'\n" , STATUS_STRING(ret), argv[2]);
 		ASSERT(ret != MFSTATUS_ERR_IO, "%s: unable to read from '%s'\n"
 			, STATUS_STRING(ret), argv[2]);
 

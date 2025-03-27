@@ -303,22 +303,35 @@ static void mflexer_destroy(struct mflexer *lexer)
 
 static int mflexer_dump(const struct mflexer *lexer, FILE *file)
 {
-	size_t ret, *meta;
+	size_t ret, state_count;
+	mfbyte_t *sizes, alphabet_size;
 	int rc;
 
 	rc = MFSTATUS_SUCCESS;
 
-	meta = array_create(2 + array_length(lexer->trans), sizeof *meta);
-	if (meta == NULL)
+	sizes = array_create(array_length(lexer->trans), sizeof *sizes);
+	if (sizes == NULL)
 		return MFSTATUS_ERR_MEM;
 
-	meta[0] = encoding_size(lexer->alphabet);
-	meta[1] = array_length(lexer->trans);
-	for (size_t i = 0; i < meta[1]; i++)
-		meta[i + 2] = array_length(lexer->trans[i]);
+	alphabet_size = encoding_size(lexer->alphabet) - 1;
+	ret = fwrite(&alphabet_size, sizeof alphabet_size, 1, file);
+	if (ret != 1) {
+		rc = MFSTATUS_ERR_IO;
+		goto out;
+	}
 
-	ret = fwrite(meta, sizeof *meta, array_length(meta), file);
-	if (ret != array_length(meta)) {
+	state_count = array_length(lexer->trans);
+	ret = fwrite(&state_count, sizeof state_count, 1, file);
+	if (ret != 1) {
+		rc = MFSTATUS_ERR_IO;
+		goto out;
+	}
+
+	for (size_t i = 0; i < state_count; i++)
+		sizes[i] = array_length(lexer->trans[i]) - 1;
+
+	ret = fwrite(sizes, sizeof *sizes, array_length(sizes), file);
+	if (ret != array_length(sizes)) {
 		rc = MFSTATUS_ERR_IO;
 		goto out;
 	}
@@ -330,32 +343,33 @@ static int mflexer_dump(const struct mflexer *lexer, FILE *file)
 		goto out;
 	}
 
-	for (size_t i = 0; i < meta[0]; i++) {
+	for (size_t i = 0; i < alphabet_size + 1; i++) {
 		ret = fwrite(lexer->trans_indices[i]
-			, sizeof *lexer->trans_indices[i], meta[0], file);
-		if (ret != meta[0]) {
+			, sizeof *lexer->trans_indices[i], alphabet_size + 1
+			, file);
+		if (ret != alphabet_size + 1) {
 			rc = MFSTATUS_ERR_IO;
 			goto out;
 		}
 	}
 
-	for (size_t i = 0; i < meta[1]; i++) {
+	for (size_t i = 0; i < state_count; i++) {
 		ret = fwrite(lexer->trans[i], sizeof *lexer->trans[i]
-			, meta[i + 2], file);
-		if (ret != meta[i + 2]) {
+			, sizes[i] + 1, file);
+		if (ret != sizes[i] + 1) {
 			rc = MFSTATUS_ERR_IO;
 			goto out;
 		}
 	}
 
-	ret = fwrite(lexer->final, sizeof *lexer->final, meta[1], file);
-	if (ret != meta[1]) {
+	ret = fwrite(lexer->final, sizeof *lexer->final, state_count, file);
+	if (ret != state_count) {
 		rc = MFSTATUS_ERR_IO;
 		goto out;
 	}
 
 out:
-	array_destroy(meta);
+	array_destroy(sizes);
 
 	return rc;
 }

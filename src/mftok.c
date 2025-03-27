@@ -32,7 +32,8 @@ static long file_size(FILE *file)
 
 int mflexer_init(struct mflexer *lexer, FILE *file)
 {
-	size_t ret, alphabet_size, state_count, *sizes;
+	size_t ret, state_count;
+	mfbyte_t alphabet_size, *sizes;
 	long lexer_size;
 	int rc;
 
@@ -72,7 +73,7 @@ int mflexer_init(struct mflexer *lexer, FILE *file)
 		goto err_trans_indices_alloc;
 	}
 
-	lexer->trans_indices = malloc(alphabet_size
+	lexer->trans_indices = malloc((alphabet_size + 1)
 		* sizeof *lexer->trans_indices);
 	if (lexer->trans_indices == NULL) {
 		rc = MFSTATUS_ERR_MEM;
@@ -81,9 +82,9 @@ int mflexer_init(struct mflexer *lexer, FILE *file)
 
 	lexer->trans_indices[0] = (void *) lexer->alphabet
 		+ MFLEXER_ALPHABET_SIZE * sizeof *lexer->alphabet;
-	for (size_t i = 1; i < alphabet_size; i++)
+	for (size_t i = 1; i < alphabet_size + 1; i++)
 		lexer->trans_indices[i] = (void *) lexer->trans_indices[i - 1]
-			+ alphabet_size * sizeof *lexer->alphabet;
+			+ (alphabet_size + 1) * sizeof *lexer->alphabet;
 
 	lexer->trans = malloc(state_count * sizeof *lexer->trans);
 	if (lexer->trans == NULL) {
@@ -91,14 +92,14 @@ int mflexer_init(struct mflexer *lexer, FILE *file)
 		goto err_trans_alloc;
 	}
 
-	lexer->trans[0] = (void *) lexer->trans_indices[alphabet_size - 1]
-		+ alphabet_size * sizeof *lexer->alphabet;
+	lexer->trans[0] = (void *) lexer->trans_indices[alphabet_size]
+		+ (alphabet_size + 1) * sizeof *lexer->alphabet;
 	for (size_t i = 1; i < state_count; i++)
-		lexer->trans[i] = (void *) lexer->trans[i - 1] + sizes[i - 1]
-			* sizeof **lexer->trans;
+		lexer->trans[i] = (void *) lexer->trans[i - 1] + (sizes[i - 1]
+			+ 1) * sizeof **lexer->trans;
 
 	lexer->final = (void *) lexer->trans[state_count - 1]
-		+ sizes[state_count - 1] * sizeof **lexer->trans;
+		+ (sizes[state_count - 1] + 1) * sizeof **lexer->trans;
 
 	free(sizes);
 
@@ -208,8 +209,8 @@ int main(int argc, char *argv[])
 
 	while (!feof(file)) {
 		ret = mflexer_tokenize_stream(&lexer, file);
-		ASSERT(ret != MFSTATUS_ERR_TOK, "%s: unknown token encountered "
-			"in '%s'\n" , STATUS_STRING(ret), argv[2]);
+		ASSERT(ret != MFSTATUS_ERR_TOK, "%s: invalid token encountered"
+			"\n", STATUS_STRING(ret));
 		ASSERT(ret != MFSTATUS_ERR_IO, "%s: unable to read from '%s'\n"
 			, STATUS_STRING(ret), argv[2]);
 

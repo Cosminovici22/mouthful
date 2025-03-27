@@ -38,14 +38,13 @@ table of size 6, corresponding to symbols 'b`, 'c', 'd', 'v', 'k', which succeed
 
 The second optimization reduces the size of the DFA alphabet by only considering
 the symbols which appear in the accepted words, as opposed to all 128 ASCII
-characters. This is done by encoding the ASCII character set. The resulting
-encoding table must be saved alongside the DFA transition table for later use.
-The purpose of this optimization is to reduce the size of the encoding matrix
-required by the first optimization.
+characters. This is done by encoding the ASCII character set. The purpose of
+this optimization is to reduce the size of the encoding matrix required by the
+first optimization.
 
 ## Building
 
-To build mfgen command line utility, run:
+To build the mfgen command line utility, run:
 ```
 make mfgen
 ```
@@ -59,3 +58,12 @@ make mftok
 ```
 
 The resulting executables and/or object files will be situated inside `build/`.
+
+## Testing
+
+To run all the available tests, run:
+```
+make test
+```
+Optionally, variables CLEANUP and DEBUG may be set to 0 prior to running the
+tests to keep the output of the tests and print output differences respectively.
